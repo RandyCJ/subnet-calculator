@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include "main.c"
 
 /*
 echo_server code taken from https://github.com/holmofy at https://github.com/holmofy/echo-server/blob/master/tcp-echo-server.c
@@ -20,6 +21,8 @@ echo_server code taken from https://github.com/holmofy at https://github.com/hol
 
 void echo(int client_fd){
     char buff[BUFFER_SIZE];
+    char response[BUFFER_SIZE];
+    char *tmp;
     do
     {
         int read_bytes = recv(client_fd, buff, BUFFER_SIZE, 0);
@@ -29,7 +32,11 @@ void echo(int client_fd){
             break;
         }
         printf("Read from client %d: %s \n", client_fd, buff);
-        if (send(client_fd, buff, read_bytes, 0) < 0)
+        tmp = subnet_calculator(buff);
+        int bytes = strlen(tmp);
+        strcpy(response, tmp);
+
+        if (send(client_fd, response, bytes, 0) < 0)
         {
             printf("Failed to write client");
             break;

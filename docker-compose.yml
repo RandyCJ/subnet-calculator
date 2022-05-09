@@ -1,0 +1,12 @@
+version: '2.4'
+
+services:
+
+  subnet-calculator:
+      image: subnet-calculator
+      container_name: subnet-calculator
+      build:
+        context: .
+      ports:
+        - 9666
+      restart: on-failure

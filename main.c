@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <regex.h>
+#include "main.h"
 
 #define BROADCAST_IP "GET BROADCAST IP "
 #define NETWORK_NUMBER "GET NETWORK NUMBER IP "
@@ -11,40 +12,43 @@
 #define REGEX_IP_MASK "[0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9] \
 MASK ([0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9]|/[0-9]?[0-9])"
 
-struct Subnet_data {
-   char  ip[50];
-   char  mask[50];
-   int   operation;
-};
-
-int verify_ip_mask(char *ip_mask){
+int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
     char tmp[20];
     strcpy(tmp, ip_mask);
     regex_t reegex;
     int is_short_mask = regcomp( &reegex, "^/", REG_EXTENDED);
     is_short_mask = regexec( &reegex, tmp, 0, NULL, 0);
+    int flag = 0;
 
     if (is_short_mask == 0){
         int mask = atoi(strtok(tmp, "/"));
         if (mask < 8 || mask > 32){
-            printf("Short mask must be between 8-32; Error /%d\n", mask);
-            return -1;
+            flag = -1;
         }
+        //tmp mientras veo como cambiar mask corta a larga
+        subnet_datas->mask[0] = 255;
+        subnet_datas->mask[1] = 255;
+        subnet_datas->mask[2] = 255;
+        subnet_datas->mask[3] = 0;
+        return flag;
     }
 
+    int i = 0;
     char *token = strtok(tmp, ".");
     while (token != NULL) {
-        if (atoi(token) > 255){
-            printf("Number must be between 0-255; Error %s\n", token);
-            return -1;
+        unsigned int tmp = atoi(token);
+        if (type == 0) subnet_datas->ip[i] = tmp;
+        else subnet_datas->mask[i] = tmp;
+        if (tmp > 255){
+            flag = -1;
         }
+        i++;
         token = strtok(NULL, ".");
     }
-    return 0;
+    return flag;
 }
 
-struct Subnet_data get_ip_mask(char *user_string, char *directive_token){
-    struct Subnet_data subnet_datas;
+void get_ip_mask(struct Subnet_data *subnet_datas, char *user_string, char *directive_token){
     char tmp[16];
     strcpy(tmp, user_string);
     char* token = strtok(tmp, directive_token);
@@ -56,28 +60,37 @@ struct Subnet_data get_ip_mask(char *user_string, char *directive_token){
     char mask[32];
     strcpy(mask, token);
 
-    if (verify_ip_mask(ip_address) < 0){
-        subnet_datas.operation = -1;
+    int flag = 0;
+    if (verify_ip_mask(ip_address, subnet_datas, 0) < 0){
+        flag = -2;
     }
-    if (verify_ip_mask(mask) < 0){
-        subnet_datas.operation = -1;
+    if (verify_ip_mask(mask, subnet_datas, 1) < 0){
+        flag = -3;
     }
-
-    strcpy(subnet_datas.ip, ip_address);
-    strcpy(subnet_datas.mask, mask);
-
-    return subnet_datas;
+    subnet_datas->operation = flag;
 }
 
-void print_ip_data(struct Subnet_data subnet_datas){
-    printf("\nIP ADDRESS: %s\n", subnet_datas.ip);
-    printf("MASK: %s\n", subnet_datas.mask);
-    printf("OPERATION: %d\n", subnet_datas.operation);
+void print_ip_data(struct Subnet_data *subnet_datas){
+    printf("\nIP ADDRESS: ");
+    for (int i=0; i<4; i++){
+        printf("%d", subnet_datas->ip[i]);
+        if (i != 3){
+            printf(".");
+        }
+    }
+    printf("\nMASK: ");
+    for (int i=0; i<4; i++){
+        printf("%d", subnet_datas->mask[i]);
+        if (i != 3){
+            printf(".");
+        }
+    }
+    printf("\nOPERATION: %d\n", subnet_datas->operation);
 }
 
-struct Subnet_data verify_operation(char *user_string){
+void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     regex_t reegex;
-    struct Subnet_data subnet_datas;
+    subnet_datas->operation = -1;
 
     //Verifying if BROADCAST IP
     int broadcast_ip;
@@ -90,11 +103,11 @@ struct Subnet_data verify_operation(char *user_string){
     broadcast_ip = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (broadcast_ip == 0){
-        subnet_datas = get_ip_mask(user_string, BROADCAST_IP);
-        if (subnet_datas.operation != -1){
-            subnet_datas.operation = 0;
+        get_ip_mask(subnet_datas, user_string, BROADCAST_IP);
+        if (subnet_datas->operation == 0){
+            subnet_datas->operation = 0;
         }
-        return subnet_datas;
+        return;
     }
 
     //Verifying if NETWORK NUMBER
@@ -108,11 +121,12 @@ struct Subnet_data verify_operation(char *user_string){
     network_number = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (network_number == 0){
-        subnet_datas = get_ip_mask(user_string, NETWORK_NUMBER);
-        if (subnet_datas.operation != -1){
-            subnet_datas.operation = 1;
+        get_ip_mask(subnet_datas, user_string, NETWORK_NUMBER);
+        //subnet_datas = get_ip_mask(user_string, NETWORK_NUMBER);
+        if (subnet_datas->operation == 0){
+            subnet_datas->operation = 1;
         }
-        return subnet_datas;
+        return;
     }
 
     //Verifying if HOSTS RANGE
@@ -126,66 +140,55 @@ struct Subnet_data verify_operation(char *user_string){
     hosts_range = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (hosts_range == 0){
-        subnet_datas = get_ip_mask(user_string, HOSTS_RANGE);
-        if (subnet_datas.operation != -1){
-            subnet_datas.operation = 2;
+        get_ip_mask(subnet_datas, user_string, HOSTS_RANGE);
+        if (subnet_datas->operation == 0){
+            subnet_datas->operation = 2;
         }
-        return subnet_datas;
+        return;
     }
-
-    return subnet_datas;
-
-    int network_number_ip;
-    int hosts_range_ip;
-    int rand_subnets_net_num;
-
 }
 
 int main(){
+    struct Subnet_data subnet_datas;
+    char *prueba = "GET BROADCAST IP 198.168.0.1 MASK 255.212.5.128";
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
-    char *prueba = "GET BROADCAST IP 14.332.4.243 MASK 25.512.5.128";
-    //struct Subnet_data subnet_datas = verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
-    
     prueba = "GET NETWORK NUMBER IP 112.12.12.6 MASK 255.5.25.128";
-    //verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
 
     prueba = "GET HOSTS RANGE IP 214.126.9.6 MASK 255.5.25.328";
-    //verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
     prueba = "GET BROADCAST IP 14.332.4.243 MASK /8";
-    //struct Subnet_data subnet_datas = verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
     
     prueba = "GET NETWORK NUMBER IP 112.12.12.6 MASK /16";
-    //verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
 
     prueba = "GET HOSTS RANGE IP 214.126.9.6 MASK /32";
-    //verify_operation(prueba);
-    print_ip_data(verify_operation(prueba));
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
 
     prueba = "GET BROADCAST IP 1723.16.0.56 MASK 255.5.25.128";
-    verify_operation(prueba);
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
     prueba = "GET NETWORK NUMBER IP 133.16.0.56 MASK /7";
-    verify_operation(prueba);
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
     prueba = "GET HOSTS RANGE IP 173.16.0.56 MASK /33";
-    verify_operation(prueba);
+    verify_operation(prueba, &subnet_datas);
+    print_ip_data(&subnet_datas);
 
     return 0;
 }
 
-
-/*
-Quedé en que tengo guardado la ip y la máscara en un struct, junto con un entero
-que me dice que tipo de operación tengo que realizar, ya está validado el IP y la mascara.
-Tareas:
-    - Pasar ip y mascara a binario para empezar a realizar las operaciones bit-wise
-*/

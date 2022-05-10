@@ -1,6 +1,12 @@
 struct Subnet_data {
    unsigned char  ip[4]; //bit array storing ip address
    unsigned char  mask[4]; //bit array storing mask
+   unsigned char  network_address[4];
+   unsigned char  broadcast_ip[4];
+   unsigned char starting_address[4];
+   unsigned char last_address[4];
+   unsigned int ip_32;
+   unsigned int mask_32;
    int   operation; //stores the operation to do or an code error
 };
 
@@ -60,7 +66,31 @@ void short_mask_to_dotted_mask(struct Subnet_data *, int mask);
         the mask value in the struct
 -----------------------------------------------------------------------
 */
-char *get_broadcast_ip(struct Subnet_data *);
+
+char *array_to_dotted_ip(unsigned char *ip);
+/*
+-----------------------------------------------------------------------
+    array_to_dotted_ip
+    Input: array of unsigned int, it contains the ip
+    Output: string with the ip separated by dots
+    Functioning: transforms an unsigned int array to a string,
+        separated by dots
+-----------------------------------------------------------------------
+*/
+
+char *build_hosts_range(unsigned char *ip1, unsigned char *ip2);
+/*
+-----------------------------------------------------------------------
+    build_hosts_range
+    Input: two array of unsigned int containing initial and final
+        address in the hosts range
+    Output: string with hosts range
+    Functioning: transforms two unsigned int array to a string,
+        separated by dots
+-----------------------------------------------------------------------
+*/
+
+void get_broadcast_ip(struct Subnet_data *);
 /*
 -----------------------------------------------------------------------
     get_broadcast_ip
@@ -71,7 +101,7 @@ char *get_broadcast_ip(struct Subnet_data *);
 -----------------------------------------------------------------------
 */
 
-char *get_network_number(struct Subnet_data *);
+void get_network_number(struct Subnet_data *);
 /*
 -----------------------------------------------------------------------
     get_network_number
@@ -82,7 +112,7 @@ char *get_network_number(struct Subnet_data *);
 -----------------------------------------------------------------------
 */
 
-char *get_hosts_range(struct Subnet_data *);
+void get_hosts_range(struct Subnet_data *);
 /*
 -----------------------------------------------------------------------
     get_hosts_range
@@ -90,5 +120,27 @@ char *get_hosts_range(struct Subnet_data *);
     Output: pointer to char with the broadcast ip
     Functioning: calculates the broadcast ip with the values stored in
         the struct
+-----------------------------------------------------------------------
+*/
+
+char *get_response(struct Subnet_data *);
+/*
+-----------------------------------------------------------------------
+    get_response
+    Input: pointer to struct
+    Output: string with the response of the user input
+    Functioning: perform the operation depending on the input 
+        of the user, then return the response
+-----------------------------------------------------------------------
+*/
+
+char *subnet_calculator(char *user_input);
+/*
+-----------------------------------------------------------------------
+    subnet_calculator
+    Input: string with the string the user wrote
+    Output: string with the response of the user input
+    Functioning: manages the subnet-calculator system, this function
+        is called from the echo_server
 -----------------------------------------------------------------------
 */

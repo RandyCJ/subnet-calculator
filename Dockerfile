@@ -1,5 +1,5 @@
-FROM gcc:4.9
+FROM gcc:9.4.0
 COPY . /usr/src/myapp
 WORKDIR /usr/src/myapp
-RUN gcc -o myapp main.c
-CMD ["./myapp"]
+RUN gcc -o echo_server echo_server.c
+CMD ["./echo_server"]

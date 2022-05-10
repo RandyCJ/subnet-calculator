@@ -94,7 +94,7 @@ void get_ip_mask(struct Subnet_data *subnet_datas, char *user_string, char *dire
 }
 
 void print_ip_data(struct Subnet_data *subnet_datas){
-    printf("\nIP ADDRESS: ");
+    printf("IP ADDRESS: ");
     for (int i=0; i<4; i++){
         printf("%d", subnet_datas->ip[i]);
         if (i != 3){
@@ -120,13 +120,13 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     char regex[200] = "^";
     strcat(regex, BROADCAST_IP);
     strcat(regex, REGEX_IP_MASK);
-    strcat(regex, "$");
+    //strcat(regex, "$");
 
     broadcast_ip = regcomp( &reegex, regex, REG_EXTENDED);
     broadcast_ip = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (broadcast_ip == 0){
-        printf("BROADCAST\n");
+        printf("\nBROADCAST\n");
         get_ip_mask(subnet_datas, user_string, BROADCAST_IP);
         if (subnet_datas->operation == 0){
             subnet_datas->operation = 0;
@@ -145,7 +145,7 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     network_number = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (network_number == 0){
-        printf("NETWORK NUMBER\n");
+        printf("\nNETWORK NUMBER\n");
         get_ip_mask(subnet_datas, user_string, NETWORK_NUMBER);
         if (subnet_datas->operation == 0){
             subnet_datas->operation = 1;
@@ -158,13 +158,13 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     char regex3[200] = "^";
     strcat(regex3, HOSTS_RANGE);
     strcat(regex3, REGEX_IP_MASK);
-    strcat(regex3, "$");
+    //strcat(regex3, "$");
 
     hosts_range = regcomp( &reegex, regex3, REG_EXTENDED);
     hosts_range = regexec( &reegex, user_string, 0, NULL, 0);
 
     if (hosts_range == 0){
-        printf("HOSTS RANGE\n");
+        printf("\nHOSTS RANGE\n");
         get_ip_mask(subnet_datas, user_string, HOSTS_RANGE);
         if (subnet_datas->operation == 0){
             subnet_datas->operation = 2;
@@ -187,29 +187,67 @@ char *array_to_dotted_ip(unsigned char *ip){
     return tmp;
 }
 
-char *get_network_number(struct Subnet_data *subnet_datas){
-    unsigned char network_number[4];
-    
+char *build_hosts_range(unsigned char *ip1, unsigned char *ip2){
+    char network_number[40] = "";
+    char number_str[5];
+
     for (int i=0; i<4; i++){
-        network_number[i] = subnet_datas->ip[i] & subnet_datas->mask[i];
+        sprintf(number_str, "%d", ip1[i]);
+        strcat(network_number, number_str);
+        if (i < 3) strcat(network_number, ".");
+        else strcat(network_number, " - ");
     }
 
-    return array_to_dotted_ip(network_number);
+    for (int i=0; i<4; i++){
+        sprintf(number_str, "%d", ip2[i]);
+        strcat(network_number, number_str);
+        if (i < 3) strcat(network_number, ".");
+        else strcat(network_number, "\n");
+    }
+
+    char *tmp = network_number;
+    return tmp;
+}
+
+void get_network_number(struct Subnet_data *subnet_datas){
+    for (int i=0; i<4; i++){
+        subnet_datas->network_address[i] = subnet_datas->ip[i] & subnet_datas->mask[i];
+    }
+}
+
+void get_broadcast_ip(struct Subnet_data *subnet_datas){
+    get_network_number(subnet_datas);
+    for (int i=0; i<4; i++){
+        subnet_datas->broadcast_ip[i] = subnet_datas->network_address[i] + (~subnet_datas->mask[i]);
+    }
+}
+
+void get_hosts_range(struct Subnet_data *subnet_datas){
+    get_network_number(subnet_datas);
+    for (int i=0; i<4; i++){
+        subnet_datas->starting_address[i] = subnet_datas->network_address[i];
+        subnet_datas->last_address[i] = subnet_datas->starting_address[i] | (~subnet_datas->mask[i]);
+    }
+    
+    subnet_datas->starting_address[3] += 1;
+    subnet_datas->last_address[3] -= 1;
 }
 
 char *get_response(struct Subnet_data *subnet_datas){
     int operation = subnet_datas->operation;
-    printf("Operacion a realizar: %d\n", operation);
 
     switch (operation){
-    // case 0:
-    //     return get_broadcast_ip(subnet_datas);
+    case 0:
+        get_broadcast_ip(subnet_datas);
+        return array_to_dotted_ip(subnet_datas->broadcast_ip);
     
     case 1:
-        return get_network_number(subnet_datas);
-    
-    // case 2:
-    //     return get_hosts_range(subnet_datas);
+        get_network_number(subnet_datas);
+        return array_to_dotted_ip(subnet_datas->network_address);
+
+    case 2:
+        get_hosts_range(subnet_datas);
+        return build_hosts_range(subnet_datas->starting_address, subnet_datas->last_address);
     
     case -1:
         return "You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.\n";
@@ -232,68 +270,106 @@ char *subnet_calculator(char *user_input){
     return get_response(&subnet_datas);
 }
 
-/*
-int main(){
-    struct Subnet_data subnet_datas;
-    char *prueba;
-    char *response;
-    /*
-    prueba = "GET BROADCAST IP 198.168.0.1 MASK 255.212.5.128";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
+
+// int main(){
+//     struct Subnet_data subnet_datas;
+//     char *prueba;
+//     char *response;
+    
+//     prueba = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Broadcast ip: %s; Esperado: 192.168.255.255\n", response);
+
+//     prueba = "GET NETWORK NUMBER IP 198.168.0.1 MASK 255.255.0.0";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Network number: %s; Esperado: 192.168.0.0\n", response);
+
+//     prueba = "GET HOSTS RANGE IP 198.168.0.1 MASK 255.255.0.0";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Hosts range: %s; Esperado: 	192.168.0.1 - 192.168.255.254\n", response);
     
 
+//     prueba = "GET BROADCAST IP 172.16.0.56 MASK /25";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Broadcast ip: %s; Esperado: 172.16.0.127\n", response);
 
-    prueba = "GET NETWORK NUMBER IP 172.16.0.56 MASK 255.255.255.128";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
-    response = get_response(&subnet_datas);
-    printf("Network number: %s\n", response);
-
-    //printf("Network number ip: %s\n", response);
-
-    // char network_ip[20] = "";
-    // printf("Network IP: ");
-    // for (int i=0; i<4; i++){
-    //     strcat(network_ip, response[i]);
-    //     if (i != 3) strcat(network_ip, ".");
-    // }
+//     prueba = "GET NETWORK NUMBER IP 172.16.0.56 MASK /25";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Network number: %s; Esperado: 172.16.0.0\n", response);
     
-    // printf("%s\n", network_ip);
+//     prueba = "GET HOSTS RANGE IP 172.16.0.56 MASK /25";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Hosts range: %s; Esperado: 	172.16.0.1 - 172.16.0.126\n", response);
 
 
-    /*
-    prueba = "GET HOSTS RANGE IP 214.126.9.6 MASK 255.5.25.328";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
-
-    prueba = "GET BROADCAST IP 14.332.4.243 MASK /8";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
+//     prueba = "GET BROADCAST IP 10.0.8.5 MASK /12";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Broadcast ip: %s; Esperado: 10.15.255.255\n", response);
     
-    prueba = "GET NETWORK NUMBER IP 112.12.12.6 MASK /16";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 10.0.8.5 MASK /12";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Network number: %s; Esperado: 10.0.0.0\n", response);
 
-    /*
-    prueba = "GET HOSTS RANGE IP 214.126.9.6 MASK /32";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 10.0.8.5 MASK /12";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Hosts range: %s; Esperado: 	10.0.0.1 - 10.15.255.254\n", response);
 
 
-    prueba = "GET BROADCAST IP 1723.16.0.56 MASK 255.5.25.128";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
-
-    prueba = "GET NETWORK NUMBER IP 133.16.0.56 MASK /7";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
-
-    prueba = "GET HOSTS RANGE IP 173.16.0.56 MASK /33";
-    verify_operation(prueba, &subnet_datas);
-    print_ip_data(&subnet_datas);
+//     prueba = "GET BROADCAST IP 10.8.2.5 MASK /29";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Broadcast ip: %s; Esperado: 10.8.2.7\n", response);
     
-    return 0;
-}
+//     prueba = "GET NETWORK NUMBER IP 10.8.2.5 MASK /29";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Network number: %s; Esperado: 10.8.2.0\n", response);
 
-*/
+//     prueba = "GET HOSTS RANGE IP 10.8.2.5 MASK /29";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Hosts range: %s; Esperado: 	10.8.2.1 - 10.8.2.6\n", response);
+
+
+//     prueba = "GET BROADCAST IP 201.203.117.214 MASK /5";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Broadcast ip: %s; Esperado: 207.255.255.255\n", response);
+    
+//     prueba = "GET NETWORK NUMBER IP 201.203.117.214 MASK /5";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Network number: %s; Esperado: 200.0.0.0\n", response);
+
+//     prueba = "GET HOSTS RANGE IP 201.203.117.214 MASK /5";
+//     verify_operation(prueba, &subnet_datas);
+//     print_ip_data(&subnet_datas);
+//     response = get_response(&subnet_datas);
+//     printf("Hosts range: %s; Esperado: 200.0.0.1 - 207.255.255.254\n", response);
+    
+//     return 0;
+// }
+

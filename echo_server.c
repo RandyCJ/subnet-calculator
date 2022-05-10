@@ -47,7 +47,7 @@ void echo(int client_fd){
     close(client_fd);
 }
 
-int main(int argc, char *argv[]){
+int main(){
     int port = 9666;
 
     int server_fd, client_fd;                  /* server and client file descriptor*/

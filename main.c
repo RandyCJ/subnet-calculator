@@ -12,6 +12,38 @@
 #define RANDOM_SUBNETS "GET RANDOM SUBNETS NETWORK NUMBER "
 #define REGEX_IP_MASK "[0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9] \
 MASK ([0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9]|/[0-9]?[0-9])"
+#define RANDOM_SUBNETS_REGEX " NUMBER [0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9]?[0-9] SIZE ([0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9][.][0-9]?[0-9]?[0-9]|/[0-9]?[0-9])"
+#define MAX_SUBNET 4194304
+
+void short_mask_to_dotted_mask2(struct Subnet_data *subnet_datas, int mask){
+    unsigned int shift = 32 - mask;
+    unsigned char full_mask[4] = {1, 1, 1, 1};
+
+    if (shift < 8){
+        subnet_datas->size[3] = ((full_mask[3] << shift)-1) ^ 255;
+        subnet_datas->size[2] = 255;
+        subnet_datas->size[1] = 255;
+        subnet_datas->size[0] = 255;
+    }
+    else if (shift < 16){
+        subnet_datas->size[3] = 0;
+        subnet_datas->size[2] = (full_mask[2] << shift-8)-1 ^ 255;
+        subnet_datas->size[1] = 255;
+        subnet_datas->size[0] = 255;
+    }
+    else if (shift < 24){
+        subnet_datas->size[3] = 0;
+        subnet_datas->size[2] = 0;
+        subnet_datas->size[1] = (full_mask[1] << shift-16)-1 ^ 255;
+        subnet_datas->size[0] = 255;
+    }
+    else{
+        subnet_datas->size[3] = 0;
+        subnet_datas->size[2] = 0;
+        subnet_datas->size[1] = 0;
+        subnet_datas->size[0] = (full_mask[0] << shift-24)-1 ^ 255;
+    }
+}
 
 void short_mask_to_dotted_mask(struct Subnet_data *subnet_datas, int mask){
     unsigned int shift = 32 - mask;
@@ -19,33 +51,39 @@ void short_mask_to_dotted_mask(struct Subnet_data *subnet_datas, int mask){
 
     if (shift < 8){
         subnet_datas->mask[3] = ((full_mask[3] << shift)-1) ^ 255;
-        subnet_datas->mask[2] = 0 ^ 255;
-        subnet_datas->mask[1] = 0 ^ 255;
-        subnet_datas->mask[0] = 0 ^ 255;
+        subnet_datas->mask[2] = 255;
+        subnet_datas->mask[1] = 255;
+        subnet_datas->mask[0] = 255;
     }
     else if (shift < 16){
-        subnet_datas->mask[3] = 255 ^ 255;
+        subnet_datas->mask[3] = 0;
         subnet_datas->mask[2] = (full_mask[2] << shift-8)-1 ^ 255;
-        subnet_datas->mask[1] = 0 ^ 255;
-        subnet_datas->mask[0] = 0 ^ 255;
+        subnet_datas->mask[1] = 255;
+        subnet_datas->mask[0] = 255;
     }
     else if (shift < 24){
-        subnet_datas->mask[3] = 255 ^ 255;
-        subnet_datas->mask[2] = 255 ^ 255;
+        subnet_datas->mask[3] = 0;
+        subnet_datas->mask[2] = 0;
         subnet_datas->mask[1] = (full_mask[1] << shift-16)-1 ^ 255;
-        subnet_datas->mask[0] = 0 ^ 255;
+        subnet_datas->mask[0] = 255;
     }
     else{
-        subnet_datas->mask[3] = 255 ^ 255;
-        subnet_datas->mask[2] = 255 ^ 255;
-        subnet_datas->mask[1] = 255 ^ 255;
+        subnet_datas->mask[3] = 0;
+        subnet_datas->mask[2] = 0;
+        subnet_datas->mask[1] = 0;
         subnet_datas->mask[0] = (full_mask[0] << shift-24)-1 ^ 255;
     }
 }
 
-int check_big_mask(unsigned char *mask_array, struct Subnet_data *subnet_datas){
+int check_big_mask(unsigned char *mask_array, struct Subnet_data *subnet_datas, int type){
     unsigned int mask = mask_array[0] | mask_array[1] << 8 | mask_array[2] << 16 | mask_array[3] << 24;
     unsigned int tmp_mask = mask;
+
+    printf("Recibi esto: ");
+    for (int i=0; i<4; i++){
+        if (i<3) printf("%d.", mask_array[i]);
+        else printf("%d\n", mask_array[i]);
+    }
 
     int cidr = 0;
     while (tmp_mask != 0){
@@ -56,7 +94,8 @@ int check_big_mask(unsigned char *mask_array, struct Subnet_data *subnet_datas){
     if (cidr <= 0 || cidr > 32){
         return -4;
     }
-    subnet_datas->cidr = cidr;
+    if (type == 1) subnet_datas->cidr = cidr;
+    else subnet_datas->second_cidr = cidr;
     struct Subnet_data tmp;
     short_mask_to_dotted_mask(&tmp, cidr);
     unsigned int correct_mask = tmp.mask[0] | tmp.mask[1] << 8 | tmp.mask[2] << 16 | tmp.mask[3] << 24;
@@ -80,8 +119,14 @@ int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
         if (mask < 1 || mask > 32){
             return -3;
         }
-        short_mask_to_dotted_mask(subnet_datas, mask);
-        subnet_datas->cidr = mask;
+        if (type == 2){
+            short_mask_to_dotted_mask2(subnet_datas, mask);
+            subnet_datas->second_cidr = mask;
+        }
+        else {
+            short_mask_to_dotted_mask(subnet_datas, mask);
+            subnet_datas->cidr = mask;
+        }
         return flag;
     }
 
@@ -90,7 +135,8 @@ int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
     while (token != NULL) {
         int tmp = atoi(token);
         if (type == 0) subnet_datas->ip[i] = tmp;
-        else subnet_datas->mask[i] = tmp;
+        else if (type == 1) subnet_datas->mask[i] = tmp;
+        else subnet_datas->size[i] = tmp;
         if (tmp > 255){
             flag = -2;
         }
@@ -99,7 +145,11 @@ int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
     }
 
     if (type == 1 && flag == 0){
-        flag = check_big_mask(subnet_datas->mask, subnet_datas);
+        flag = check_big_mask(subnet_datas->mask, subnet_datas, 1);
+    }
+
+    if (type == 2 && flag == 0){
+        flag = check_big_mask(subnet_datas->size, subnet_datas, 2);
     }
 
     return flag;
@@ -118,10 +168,41 @@ void get_ip_mask(struct Subnet_data *subnet_datas, char *user_string, char *dire
     char mask[50];
     strcpy(mask, token);
 
+    char number[10];
+    char size[50];
+
+    if (strcmp(directive_token, RANDOM_SUBNETS) == 0){
+        token = strtok(NULL, " NUMBER ");
+        strcpy(number, token);
+        token = strtok(NULL, " SIZE ");
+        strcpy(size, token);
+    }
+
+
     int flag = 0;
     flag = verify_ip_mask(ip_address, subnet_datas, 0);
-    int tmp_flag = verify_ip_mask(mask, subnet_datas, 1);
-    if (tmp_flag != 0) flag = tmp_flag;
+    if (flag != 0){
+        subnet_datas->operation = flag;
+        return;
+    }
+
+    flag = verify_ip_mask(mask, subnet_datas, 1);
+    if (flag != 0){
+        subnet_datas->operation = flag;
+        return;
+    }
+
+    if (strcmp(directive_token, RANDOM_SUBNETS) == 0){
+        if (atoi(number) > MAX_SUBNET){
+            subnet_datas->operation = -5;
+            return;
+        }
+        subnet_datas->number = atoi(number);
+
+        flag = verify_ip_mask(size, subnet_datas, 2);
+    }
+
+    
     subnet_datas->operation = flag;
 }
 
@@ -152,7 +233,8 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     char regex[200] = "^";
     strcat(regex, BROADCAST_IP);
     strcat(regex, REGEX_IP_MASK);
-    //strcat(regex, "$");
+    strcat(regex, "\r");
+    strcat(regex, "\n");
 
     broadcast_ip = regcomp( &reegex, regex, REG_EXTENDED);
     broadcast_ip = regexec( &reegex, user_string, 0, NULL, 0);
@@ -171,7 +253,8 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     char regex2[200] = "^";
     strcat(regex2, NETWORK_NUMBER);
     strcat(regex2, REGEX_IP_MASK);
-    //strcat(regex2, "$");
+    strcat(regex2, "\r");
+    strcat(regex2, "\n");
 
     network_number = regcomp( &reegex, regex2, REG_EXTENDED);
     network_number = regexec( &reegex, user_string, 0, NULL, 0);
@@ -190,7 +273,8 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     char regex3[200] = "^";
     strcat(regex3, HOSTS_RANGE);
     strcat(regex3, REGEX_IP_MASK);
-    //strcat(regex3, "$");
+    strcat(regex3, "\r");
+    strcat(regex3, "\n");
 
     hosts_range = regcomp( &reegex, regex3, REG_EXTENDED);
     hosts_range = regexec( &reegex, user_string, 0, NULL, 0);
@@ -200,6 +284,27 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
         get_ip_mask(subnet_datas, user_string, HOSTS_RANGE);
         if (subnet_datas->operation == 0){
             subnet_datas->operation = 2;
+        }
+        return;
+    }
+
+    //Verifying if RANDOM SUBNET
+    int random_subnet;
+    char regex4[400] = "^";
+    strcat(regex4, RANDOM_SUBNETS);
+    strcat(regex4, REGEX_IP_MASK);
+    strcat(regex4, RANDOM_SUBNETS_REGEX);
+    strcat(regex4, "\r");
+    strcat(regex4, "\n");
+
+    hosts_range = regcomp( &reegex, regex4, REG_EXTENDED);
+    hosts_range = regexec( &reegex, user_string, 0, NULL, 0);
+
+    if (hosts_range == 0){
+        printf("\nRANDOM SUBNET\n");
+        get_ip_mask(subnet_datas, user_string, RANDOM_SUBNETS);
+        if (subnet_datas->operation == 0){
+            subnet_datas->operation = 3;
         }
         return;
     }
@@ -284,6 +389,26 @@ char *get_response(struct Subnet_data *subnet_datas){
         }
         return build_hosts_range(subnet_datas->starting_address, subnet_datas->last_address);
     
+    case 3:
+        printf("Tengo este NUMBER: %d\n", subnet_datas->number);
+        printf("Con esta mascara final: ");
+        for (int i=0; i<4; i++){
+            if (i<3) printf("%d.", subnet_datas->size[i]);
+            else printf("%d\n", subnet_datas->size[i]);
+        }
+        printf("CIDR 1: %d\n", subnet_datas->cidr);
+        printf("CIDR 2: %d\n", subnet_datas->second_cidr);
+        
+        if (subnet_datas->second_cidr <= subnet_datas->cidr){
+            return "Second CIDR mask must be greater than first CIRD mask\n";
+        }
+        double total_subnets = pow(2, 32-subnet_datas->cidr)/pow(2, 32-subnet_datas->second_cidr);
+        if (total_subnets < subnet_datas->number){
+            return "You requested an amount of random subnets that is greater than the possibles for the IP and MASK given\n";
+        }
+        //RANDOM IP beetwen hosts range and AND with SIZE
+        return "RANDOM SUBNET WIP\n";
+
     case -1:
         return "You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.\n";
     
@@ -295,6 +420,9 @@ char *get_response(struct Subnet_data *subnet_datas){
     
     case -4:
         return "You entered an invalid mask. Make sure to use CIDR value between 1 and 32\n";
+
+    case -5:
+        return "The MAX SUBNET number possible for calculating random subnet is 4194304\n";
 
     default:
         return "Something went wrong.\n";
@@ -308,106 +436,82 @@ char *subnet_calculator(char *user_input){
     return get_response(&subnet_datas);
 }
 
+// int main(){
+//     //char *test = "GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 65535 SIZE /24\r\n";
+//     char *test = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0\r\n";
+//     char *response = subnet_calculator(test);
+//     printf("Response: %s\n", response);
 
+// }
 
-// // //PRUEBAS
+// // // //PRUEBAS
 // int main(){
 //     struct Subnet_data subnet_datas;
 //     char *prueba;
 //     char *response;
     
-//     prueba = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Broadcast ip: %s; Esperado: 192.168.255.255\n", response);
 
-//     prueba = "GET NETWORK NUMBER IP 198.168.0.1 MASK 255.255.0.0";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 198.168.0.1 MASK 255.255.0.0\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Network number: %s; Esperado: 192.168.0.0\n", response);
 
-//     prueba = "GET HOSTS RANGE IP 198.168.0.1 MASK 255.255.0.0";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 198.168.0.1 MASK 255.255.0.0\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Hosts range: %s; Esperado: 	192.168.0.1 - 192.168.255.254\n", response);
     
 
-//     prueba = "GET BROADCAST IP 172.16.0.56 MASK /25";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET BROADCAST IP 172.16.0.56 MASK /25\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Broadcast ip: %s; Esperado: 172.16.0.127\n", response);
 
-//     prueba = "GET NETWORK NUMBER IP 172.16.0.56 MASK /25";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 172.16.0.56 MASK /25\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Network number: %s; Esperado: 172.16.0.0\n", response);
     
-//     prueba = "GET HOSTS RANGE IP 172.16.0.56 MASK /25";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 172.16.0.56 MASK /25\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Hosts range: %s; Esperado: 	172.16.0.1 - 172.16.0.126\n", response);
 
 
-//     prueba = "GET BROADCAST IP 10.0.8.5 MASK /12";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET BROADCAST IP 10.0.8.5 MASK /12\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Broadcast ip: %s; Esperado: 10.15.255.255\n", response);
     
-//     prueba = "GET NETWORK NUMBER IP 10.0.8.5 MASK /12";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 10.0.8.5 MASK /12\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Network number: %s; Esperado: 10.0.0.0\n", response);
 
-//     prueba = "GET HOSTS RANGE IP 10.0.8.5 MASK /12";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 10.0.8.5 MASK /12\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Hosts range: %s; Esperado: 	10.0.0.1 - 10.15.255.254\n", response);
 
 
-//     prueba = "GET BROADCAST IP 10.8.2.5 MASK /29";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET BROADCAST IP 10.8.2.5 MASK /29\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Broadcast ip: %s; Esperado: 10.8.2.7\n", response);
     
-//     prueba = "GET NETWORK NUMBER IP 10.8.2.5 MASK /29";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 10.8.2.5 MASK /29\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Network number: %s; Esperado: 10.8.2.0\n", response);
 
-//     prueba = "GET HOSTS RANGE IP 10.8.2.5 MASK /29";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 10.8.2.5 MASK /29\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Hosts range: %s; Esperado: 	10.8.2.1 - 10.8.2.6\n", response);
 
 
-//     prueba = "GET BROADCAST IP 201.203.117.214 MASK /5";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET BROADCAST IP 201.203.117.214 MASK /5\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Broadcast ip: %s; Esperado: 207.255.255.255\n", response);
     
-//     prueba = "GET NETWORK NUMBER IP 201.203.117.214 MASK /5";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET NETWORK NUMBER IP 201.203.117.214 MASK /5\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Network number: %s; Esperado: 200.0.0.0\n", response);
 
-//     prueba = "GET HOSTS RANGE IP 201.203.117.214 MASK /5";
-//     verify_operation(prueba, &subnet_datas);
-//     print_ip_data(&subnet_datas);
-//     response = get_response(&subnet_datas);
+//     prueba = "GET HOSTS RANGE IP 201.203.117.214 MASK /5\r\n";
+//     response = subnet_calculator(prueba);
 //     printf("Hosts range: %s; Esperado: 200.0.0.1 - 207.255.255.254\n", response);
     
 //     return 0;

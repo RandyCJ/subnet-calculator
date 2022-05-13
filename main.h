@@ -6,7 +6,10 @@ struct Subnet_data {
    unsigned char  broadcast_ip[4];
    unsigned char  starting_address[4];
    unsigned char  last_address[4];
+   unsigned char size[4];
+   int number;
    int cidr;
+   int second_cidr;
    int   operation; //stores the operation to do or an code error
 };
 
@@ -145,7 +148,7 @@ char *subnet_calculator(char *user_input);
 -----------------------------------------------------------------------
 */
 
-int check_big_mask(unsigned char *mask_array, struct Subnet_data *);
+int check_big_mask(unsigned char *mask_array, struct Subnet_data *, int type);
 /*
 -----------------------------------------------------------------------
     check_big_mask

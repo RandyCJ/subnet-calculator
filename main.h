@@ -1,12 +1,12 @@
+
 struct Subnet_data {
    unsigned char  ip[4]; //bit array storing ip address
    unsigned char  mask[4]; //bit array storing mask
    unsigned char  network_address[4];
    unsigned char  broadcast_ip[4];
-   unsigned char starting_address[4];
-   unsigned char last_address[4];
-   unsigned int ip_32;
-   unsigned int mask_32;
+   unsigned char  starting_address[4];
+   unsigned char  last_address[4];
+   int cidr;
    int   operation; //stores the operation to do or an code error
 };
 
@@ -142,5 +142,16 @@ char *subnet_calculator(char *user_input);
     Output: string with the response of the user input
     Functioning: manages the subnet-calculator system, this function
         is called from the echo_server
+-----------------------------------------------------------------------
+*/
+
+int check_big_mask(unsigned char *mask_array, struct Subnet_data *);
+/*
+-----------------------------------------------------------------------
+    check_big_mask
+    Input: array of unsigned char containing a mask
+    Output: integer, 0 if correct, -4 if not
+    Functioning: check if a big mask introduced by the user
+        is valid
 -----------------------------------------------------------------------
 */

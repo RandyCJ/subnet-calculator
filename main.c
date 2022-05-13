@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <regex.h>
+#include <math.h>
 #include "main.h"
 
 #define BROADCAST_IP "GET BROADCAST IP "
@@ -42,8 +43,32 @@ void short_mask_to_dotted_mask(struct Subnet_data *subnet_datas, int mask){
     }
 }
 
+int check_big_mask(unsigned char *mask_array, struct Subnet_data *subnet_datas){
+    unsigned int mask = mask_array[0] | mask_array[1] << 8 | mask_array[2] << 16 | mask_array[3] << 24;
+    unsigned int tmp_mask = mask;
+
+    int cidr = 0;
+    while (tmp_mask != 0){
+        tmp_mask = tmp_mask & (tmp_mask-1);
+        cidr += 1;
+    }
+
+    if (cidr <= 0 || cidr > 32){
+        return -4;
+    }
+    subnet_datas->cidr = cidr;
+    struct Subnet_data tmp;
+    short_mask_to_dotted_mask(&tmp, cidr);
+    unsigned int correct_mask = tmp.mask[0] | tmp.mask[1] << 8 | tmp.mask[2] << 16 | tmp.mask[3] << 24;
+    
+    if (correct_mask == mask){
+        return 0;
+    }
+    return -4;
+}
+
 int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
-    char tmp[20];
+    char tmp[100];
     strcpy(tmp, ip_mask);
     regex_t reegex;
     int is_short_mask = regcomp( &reegex, "^/", REG_EXTENDED);
@@ -56,6 +81,7 @@ int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
             return -3;
         }
         short_mask_to_dotted_mask(subnet_datas, mask);
+        subnet_datas->cidr = mask;
         return flag;
     }
 
@@ -71,19 +97,25 @@ int verify_ip_mask(char *ip_mask, struct Subnet_data *subnet_datas, int type){
         i++;
         token = strtok(NULL, ".");
     }
+
+    if (type == 1 && flag == 0){
+        flag = check_big_mask(subnet_datas->mask, subnet_datas);
+    }
+
     return flag;
 }
 
 void get_ip_mask(struct Subnet_data *subnet_datas, char *user_string, char *directive_token){
-    char tmp[16];
+    char tmp[1024];
     strcpy(tmp, user_string);
     char* token = strtok(tmp, directive_token);
 
-    char ip_address[32];
+
+    char ip_address[50];
     strcpy(ip_address, token);
 
     token = strtok(NULL, " MASK ");
-    char mask[32];
+    char mask[50];
     strcpy(mask, token);
 
     int flag = 0;
@@ -224,11 +256,11 @@ void get_broadcast_ip(struct Subnet_data *subnet_datas){
 
 void get_hosts_range(struct Subnet_data *subnet_datas){
     get_network_number(subnet_datas);
+    get_broadcast_ip(subnet_datas);
     for (int i=0; i<4; i++){
         subnet_datas->starting_address[i] = subnet_datas->network_address[i];
-        subnet_datas->last_address[i] = subnet_datas->starting_address[i] | (~subnet_datas->mask[i]);
+        subnet_datas->last_address[i] = subnet_datas->broadcast_ip[i];
     }
-    
     subnet_datas->starting_address[3] += 1;
     subnet_datas->last_address[3] -= 1;
 }
@@ -247,6 +279,9 @@ char *get_response(struct Subnet_data *subnet_datas){
 
     case 2:
         get_hosts_range(subnet_datas);
+        if (subnet_datas->cidr > 30){
+            return "There isn't a usable host range for cidr mask greater than 30\n";
+        }
         return build_hosts_range(subnet_datas->starting_address, subnet_datas->last_address);
     
     case -1:
@@ -256,7 +291,10 @@ char *get_response(struct Subnet_data *subnet_datas){
         return "Numbers in ip address and mask must be greater than -1 and lower than 256.\n";
 
     case -3:
-        return "Short masks must be greater than 0 and lower than 33.\n";
+        return "CIDR masks must be greater than 0 and lower than 33.\n";
+    
+    case -4:
+        return "You entered an invalid mask. Make sure to use CIDR value between 1 and 32\n";
 
     default:
         return "Something went wrong.\n";
@@ -271,6 +309,8 @@ char *subnet_calculator(char *user_input){
 }
 
 
+
+// // //PRUEBAS
 // int main(){
 //     struct Subnet_data subnet_datas;
 //     char *prueba;

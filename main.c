@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <regex.h>
 #include <math.h>
+#include <time.h>
 #include "main.h"
 
 #define BROADCAST_IP "GET BROADCAST IP "
@@ -78,12 +79,6 @@ void short_mask_to_dotted_mask(struct Subnet_data *subnet_datas, int mask){
 int check_big_mask(unsigned char *mask_array, struct Subnet_data *subnet_datas, int type){
     unsigned int mask = mask_array[0] | mask_array[1] << 8 | mask_array[2] << 16 | mask_array[3] << 24;
     unsigned int tmp_mask = mask;
-
-    printf("Recibi esto: ");
-    for (int i=0; i<4; i++){
-        if (i<3) printf("%d.", mask_array[i]);
-        else printf("%d\n", mask_array[i]);
-    }
 
     int cidr = 0;
     while (tmp_mask != 0){
@@ -310,7 +305,7 @@ void verify_operation(char *user_string, struct Subnet_data *subnet_datas){
     }
 }
 
-char *array_to_dotted_ip(unsigned char *ip){
+char *array_to_dotted_ip(unsigned char *ip, int flag){
     char network_number[20] = "";
     char number_str[5];
 
@@ -318,7 +313,10 @@ char *array_to_dotted_ip(unsigned char *ip){
         sprintf(number_str, "%d", ip[i]);
         strcat(network_number, number_str);
         if (i < 3) strcat(network_number, ".");
-        else strcat(network_number, "\n");
+        // else strcat(network_number, "\n");
+    }
+    if (flag == 0){
+        strcat(network_number, "\n");
     }
     char *tmp = network_number;
     return tmp;
@@ -344,6 +342,15 @@ char *build_hosts_range(unsigned char *ip1, unsigned char *ip2){
 
     char *tmp = network_number;
     return tmp;
+}
+
+int is_subnet_in_list(unsigned int random_subnets[], unsigned int subnet, int length){
+    for (int i=0; i<length; i++){
+        if (subnet == random_subnets[i]){
+            return 0;
+        }
+    }
+    return 1;
 }
 
 void get_network_number(struct Subnet_data *subnet_datas){
@@ -372,73 +379,102 @@ void get_hosts_range(struct Subnet_data *subnet_datas){
 
 char *get_response(struct Subnet_data *subnet_datas){
     int operation = subnet_datas->operation;
+    unsigned int random_subnets[subnet_datas->number];
 
     switch (operation){
-    case 0:
-        get_broadcast_ip(subnet_datas);
-        return array_to_dotted_ip(subnet_datas->broadcast_ip);
-    
-    case 1:
-        get_network_number(subnet_datas);
-        return array_to_dotted_ip(subnet_datas->network_address);
-
-    case 2:
-        get_hosts_range(subnet_datas);
-        if (subnet_datas->cidr > 30){
-            return "There isn't a usable host range for cidr mask greater than 30\n";
-        }
-        return build_hosts_range(subnet_datas->starting_address, subnet_datas->last_address);
-    
-    case 3:
-        printf("Tengo este NUMBER: %d\n", subnet_datas->number);
-        printf("Con esta mascara final: ");
-        for (int i=0; i<4; i++){
-            if (i<3) printf("%d.", subnet_datas->size[i]);
-            else printf("%d\n", subnet_datas->size[i]);
-        }
-        printf("CIDR 1: %d\n", subnet_datas->cidr);
-        printf("CIDR 2: %d\n", subnet_datas->second_cidr);
+        case 0:
+            get_broadcast_ip(subnet_datas);
+            return array_to_dotted_ip(subnet_datas->broadcast_ip, 0);
         
-        if (subnet_datas->second_cidr <= subnet_datas->cidr){
-            return "Second CIDR mask must be greater than first CIRD mask\n";
-        }
-        double total_subnets = pow(2, 32-subnet_datas->cidr)/pow(2, 32-subnet_datas->second_cidr);
-        if (total_subnets < subnet_datas->number){
-            return "You requested an amount of random subnets that is greater than the possibles for the IP and MASK given\n";
-        }
-        //RANDOM IP beetwen hosts range and AND with SIZE
-        return "RANDOM SUBNET WIP\n";
+        case 1:
+            get_network_number(subnet_datas);
+            return array_to_dotted_ip(subnet_datas->network_address, 0);
 
-    case -1:
-        return "You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.\n";
-    
-    case -2:
-        return "Numbers in ip address and mask must be greater than -1 and lower than 256.\n";
+        case 2:
+            get_hosts_range(subnet_datas);
+            if (subnet_datas->cidr > 30){
+                return "There isn't a usable host range for cidr masks greater than 30\n";
+            }
+            return build_hosts_range(subnet_datas->starting_address, subnet_datas->last_address);
+        
+        case 3:
+            get_hosts_range(subnet_datas);
+            if (subnet_datas->second_cidr <= subnet_datas->cidr){
+                return "Second CIDR mask must be greater than first CIDR mask\n";
+            }
+            double total_subnets = pow(2, 32-subnet_datas->cidr)/pow(2, 32-subnet_datas->second_cidr);
+            if (total_subnets < subnet_datas->number){
+                return "You requested an amount of random subnets that is greater than the possibles for the IP and MASK given\n";
+            }
 
-    case -3:
-        return "CIDR masks must be greater than 0 and lower than 33.\n";
-    
-    case -4:
-        return "You entered an invalid mask. Make sure to use CIDR value between 1 and 32\n";
+            unsigned int lower = subnet_datas->starting_address[3] | subnet_datas->starting_address[2] << 8 | subnet_datas->starting_address[1] << 16 | subnet_datas->starting_address[0] << 24;
+            unsigned int upper = (subnet_datas->last_address[3]) | (subnet_datas->last_address[2] << 8) | (subnet_datas->last_address[1] << 16) | (subnet_datas->last_address[0] << 24);
+            unsigned int second_mask = (subnet_datas->size[3]) | (subnet_datas->size[2] << 8) | (subnet_datas->size[1] << 16) | (subnet_datas->size[0] << 24);
 
-    case -5:
-        return "The MAX SUBNET number possible for calculating random subnet is 4194304\n";
+            srand(time(NULL));
+            unsigned int subnet;
+            for (int i=0; i<subnet_datas->number; i++){
+                subnet = ((rand() % (upper - lower + 1)) + lower) & second_mask;
+                while (is_subnet_in_list(random_subnets, subnet, i) == 0){
+                    subnet = ((rand() % (upper - lower + 1)) + lower) & second_mask;
+                }
+                random_subnets[i] = subnet;
+            }
 
-    default:
-        return "Something went wrong.\n";
+            unsigned char bytes[4];
+            char random_subnets_str[10000000] = "";
+            int count = 0;
+            char number_str[10];
+
+            while (count < subnet_datas->number){
+                sprintf(number_str, "%d", count+1);
+                strcat(random_subnets_str, number_str);
+                strcat(random_subnets_str, ". ");
+                bytes[3] = random_subnets[count];
+                bytes[2] = random_subnets[count] >> 8;
+                bytes[1] = random_subnets[count] >> 16;
+                bytes[0] = random_subnets[count] >> 24;
+                strcat(random_subnets_str, array_to_dotted_ip(bytes, 1));
+                strcat(random_subnets_str, "/");
+                sprintf(number_str, "%d", subnet_datas->second_cidr);
+                strcat(random_subnets_str, number_str);
+                strcat(random_subnets_str, "\n");
+                count++;
+            }
+
+            char *tmp = random_subnets_str;
+            return tmp;
+
+        case -1:
+            return "You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.\n";
+        
+        case -2:
+            return "Numbers in ip address and mask must be greater than -1 and lower than 256.\n";
+
+        case -3:
+            return "CIDR masks must be greater than 0 and lower than 33.\n";
+        
+        case -4:
+            return "You entered an invalid mask. Make sure to use CIDR value between 1 and 32\n";
+
+        case -5:
+            return "The MAX SUBNET number possible for calculating random subnet is 4194304\n";
+
+        default:
+            return "Something went wrong.\n";
     }
 }
 
 char *subnet_calculator(char *user_input){
     struct Subnet_data subnet_datas;
     verify_operation(user_input, &subnet_datas);
-    print_ip_data(&subnet_datas);
+    // print_ip_data(&subnet_datas);
     return get_response(&subnet_datas);
 }
 
 // int main(){
-//     //char *test = "GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 65535 SIZE /24\r\n";
-//     char *test = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0\r\n";
+//     char *test = "GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 3 SIZE /24\r\n";
+//     // char *test = "GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0\r\n";
 //     char *response = subnet_calculator(test);
 //     printf("Response: %s\n", response);
 

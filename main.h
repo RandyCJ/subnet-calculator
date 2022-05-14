@@ -70,7 +70,7 @@ void short_mask_to_dotted_mask(struct Subnet_data *, int mask);
 -----------------------------------------------------------------------
 */
 
-char *array_to_dotted_ip(unsigned char *ip);
+char *array_to_dotted_ip(unsigned char *ip, int flag);
 /*
 -----------------------------------------------------------------------
     array_to_dotted_ip
@@ -158,3 +158,5 @@ int check_big_mask(unsigned char *mask_array, struct Subnet_data *, int type);
         is valid
 -----------------------------------------------------------------------
 */
+
+int is_subnet_in_list(unsigned int random_subnets[], unsigned int subnet, int lenght);

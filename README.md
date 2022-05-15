@@ -144,6 +144,8 @@ Las consultas que podemos realizar en la calculadora de subredes se detallan a c
     - GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 3 SIZE /24
 
 ## Ejemplos de uso, respuestas, y mensajes de error
+ 
+Es posible que el primer mensaje que pongamos, aunque esté correcto tire el primer error que vemos a continuación, por lo que si pasa no se preocupe y vuelva a ejecutarlo una vez más.
 
 Si escribimos algo que no concuerda con ninguna de las directivas descritas arriba, o los octetos tienen 4 o más números, o hay alguna letra donde no debería haber alguna, o si hay texto después de una directiva escrita correctamente, aunque sea un espacio, saldrá el siguiente error.  
 ![telnet1](https://user-images.githubusercontent.com/61055501/168456365-7873e969-2ac2-47fc-a9fc-f121e97f9a81.png)

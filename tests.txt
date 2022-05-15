@@ -1,0 +1,66 @@
+GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 3 SIZE /24
+Expected: Something similar to
+1. 10.117.186.0/24
+2. 10.177.170.0/24
+3. 10.41.77.0/24
+
+GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK 255.0.0.0 NUMBER 3 SIZE 255.255.255.0
+Expected: Something similar to
+1. 10.199.209.0/24
+2. 10.54.223.0/24
+3. 10.22.90.0/24
+
+GET BROADCAST IP 198.168.0.1 MASK 255.255.0.0
+Expected: 192.168.255.255
+
+GET NETWORK NUMBER IP 198.168.0.1 MASK 255.255.0.0
+Expected: 192.168.0.0
+
+GET HOSTS RANGE IP 198.168.0.1 MASK 255.255.0.0
+Expected: 	192.168.0.1 - 192.168.255.254
+
+GET BROADCAST IP 172.16.0.56 MASK /25
+Expected: 172.16.0.127
+
+GET NETWORK NUMBER IP 172.16.0.56 MASK /25
+Expected: 172.16.0.0
+
+GET HOSTS RANGE IP 172.16.0.56 MASK /25
+Expected: 172.16.0.1 - 172.16.0.126
+
+HELLO
+Expected: You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.
+
+GET BROADCAST IP 192.183.0.1 MASK 255.3454.255.255
+Expected: You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.
+
+
+GET BROADCAST IP 192.183.0.1 MASK 255.255.25g.0
+Expected: You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.
+
+GET BROADCAST IP 192.183.0.1 MASK 255.255.255.0 TEXT
+Expected: You either entered a wrong directive or didn't entered a positive number with 1, 2 or 3 digits.
+
+GET BROADCAST IP 198.168.0.1 MASK 255.256.0.0
+Expected: Numbers in ip address and mask must be greater than -1 and lower than 256.
+
+GET BROADCAST IP 198.168.0.1 MASK /7
+Expected: CIDR masks must be greater than 7 and lower than 33.
+
+GET BROADCAST IP 198.168.0.1 MASK /33
+Expected: CIDR masks must be greater than 7 and lower than 33.
+
+GET BROADCAST IP 198.168.0.1 MASK 255.255.255.1
+Expected: You entered an invalid mask. Make sure to use CIDR value between 1 and 32
+
+GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /16 NUMBER 5 SIZE /16
+Expected: Second CIDR mask must be greater than first CIDR mask
+
+GET RANDOM SUBNETS NETWORK NUMBER 10.0.0.0 MASK /8 NUMBER 3 SIZE /9
+Expected: You requested an amount of random subnets that is greater than the possibles for the IP and MASK given
+
+GET HOSTS RANGE IP 198.168.0.1 MASK /31
+Expected: There isn't a usable host range for cidr masks greater than 30
+
+GET HOSTS RANGE IP 198.168.0.1 MASK /32
+Expected: There isn't a usable host range for cidr masks greater than 30

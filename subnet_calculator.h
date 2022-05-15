@@ -1,15 +1,15 @@
 
 struct Subnet_data {
-   unsigned char  ip[4]; //bit array storing ip address
-   unsigned char  mask[4]; //bit array storing mask
-   unsigned char  network_address[4];
-   unsigned char  broadcast_ip[4];
-   unsigned char  starting_address[4];
-   unsigned char  last_address[4];
-   unsigned char size[4];
-   int number;
-   int cidr;
-   int second_cidr;
+   unsigned int  ip;
+   unsigned int  mask;
+   unsigned int  network_address;
+   unsigned int  broadcast_ip;
+   unsigned int  starting_address; //starting address of hosts range
+   unsigned int  last_address; //last address of hosts range
+   unsigned int  size; //SIZE mask in RANDOM SUBNETS directive
+   int number; //NUMBER in RANDOM SUBNETS directive
+   int cidr; // mask in /size format, the integer
+   int second_cidr; // SIZE in /format, the integer
    int   operation; //stores the operation to do or an code error
 };
 
@@ -70,7 +70,7 @@ void short_mask_to_dotted_mask(struct Subnet_data *, int mask);
 -----------------------------------------------------------------------
 */
 
-char *array_to_dotted_ip(unsigned char *ip, int flag);
+char *array_to_dotted_ip(unsigned int ip, int flag);
 /*
 -----------------------------------------------------------------------
     array_to_dotted_ip
@@ -81,7 +81,7 @@ char *array_to_dotted_ip(unsigned char *ip, int flag);
 -----------------------------------------------------------------------
 */
 
-char *build_hosts_range(unsigned char *ip1, unsigned char *ip2);
+char *build_hosts_range(unsigned int ip1, unsigned int ip2);
 /*
 -----------------------------------------------------------------------
     build_hosts_range
@@ -148,7 +148,7 @@ char *subnet_calculator(char *user_input);
 -----------------------------------------------------------------------
 */
 
-int check_big_mask(unsigned char *mask_array, struct Subnet_data *, int type);
+int check_big_mask(struct Subnet_data *, int type);
 /*
 -----------------------------------------------------------------------
     check_big_mask
@@ -160,3 +160,22 @@ int check_big_mask(unsigned char *mask_array, struct Subnet_data *, int type);
 */
 
 int is_subnet_in_list(unsigned int random_subnets[], unsigned int subnet, int lenght);
+/*
+-----------------------------------------------------------------------
+    is_subnet_in_list
+    Input: array of unsigned ints, containing subnets, a subnet, and length of array
+    Output: integer, 0 subnet in array, 1 if not
+    Functioning: check if a subnet is in the array
+-----------------------------------------------------------------------
+*/
+
+char *get_random_subnets(struct Subnet_data *);
+/*
+-----------------------------------------------------------------------
+    get_random_subnets
+    Input: pointer to struct
+    Output: string with the random subnet
+    Functioning: performs the operations to get n random
+        subnets from an ip, mask and second mask
+-----------------------------------------------------------------------
+*/

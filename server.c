@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include "main.c"
+#include "subnet_calculator.c"
 
 /*
 echo_server code taken from https://github.com/holmofy at https://github.com/holmofy/echo-server/blob/master/tcp-echo-server.c
@@ -21,7 +21,7 @@ echo_server code taken from https://github.com/holmofy at https://github.com/hol
 
 void echo(int client_fd){
     char buff[BUFFER_SIZE];
-    char response[BUFFER_SIZE];
+    char response[10000];
     char *tmp;
     do
     {
